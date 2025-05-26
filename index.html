@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini HTML IDE - Light Edition</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code&display=swap" rel="stylesheet">
+  <style>
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #e5e7eb; /* bg-gray-200 */
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #9ca3af; /* bg-gray-400 */
+      border-radius: 5px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #6b7280; /* bg-gray-500 */
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    textarea.code-editor {
+        font-family: 'Fira Code', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        tab-size: 4;
+        white-space: pre;
+        word-wrap: normal;
+        overflow-x: auto;
+        background-color: #ffffff; /* Ensure white background for editor */
+        color: #1f2937; /* gray-800 for text */
+        border: 1px solid #d1d5db; /* gray-300 for border */
+    }
+    /* Ensure the app takes full height */
+    html, body, #root {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #root > div { /* Direct child of root, which is the main App div */
+        min-height: 100vh;
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "react": "https://esm.sh/react@^19.1.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.0.1"
+  }
+}
+</script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="root"></div>
+  <script type="module">
+    import React, { useState, useCallback, useRef } from 'react';
+    import ReactDOM from 'react-dom/client';
+    import { GoogleGenAI } from '@google/genai';
+
+    // --- SVG ICONS ---
+    const SparklesIcon = ({ className = "w-5 h-5" }) => React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 20 20", fill: "currentColor", className: className
+      }, React.createElement('path', { fillRule: "evenodd", d: "M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.393c-.842.07-1.17.974-.585 1.526l3.632 3.263-1.09 4.646c-.215.913.762 1.647 1.56 1.182L10 15.447l4.182 2.31c.798.465 1.775-.269 1.56-1.182l-1.09-4.646 3.632-3.263c.585-.552.257-1.456-.585-1.526l-4.753-.393-1.83-4.401z", clipRule: "evenodd"}));
+
+    const RocketIcon = ({ className = "w-5 h-5" }) => React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "1.5", stroke: "currentColor", className: className
+    }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M15.59 14.37a6 6 0 01-5.84 7.38v-4.82m5.84-2.56a6 6 0 01-2.28 4.95M15.59 14.37a6 6 0 01-4.71 4.71M5.84 14.37a6 6 0 014.71-4.71m5.84 2.56a6 6 0 017.38 5.84m-12.92 0a6 6 0 01-7.38-5.84m0 0A6.969 6.969 0 013 6.654a6.97 6.97 0 012.23-.531m13.437 0a6.97 6.97 0 012.23.531 6.969 6.969 0 013 7.718m-18.687 0A6.97 6.97 0 012.23 19.47M3 6.654a6.97 6.97 0 0118.687 0M3 6.654l1.657-2.486A6.973 6.973 0 019.93 2.53a6.973 6.973 0 015.269 1.638L19.77 6.654M3 6.654A6.973 6.973 0 012.53 9.93a6.973 6.973 0 011.638 5.269L6.654 19.77M19.77 6.654A6.973 6.973 0 0119.47 9.93a6.973 6.973 0 01-1.638 5.269L15.346 19.77" }));
+
+    const WandIcon = ({ className = "w-5 h-5 mr-2" }) => React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 20 20", fill: "currentColor", className: className
+    }, React.createElement('path', { d: "M11.225 2.062c.44-.66.232-1.59-.464-1.846a.75.75 0 00-.31-.063L3.51 2.004A.75.75 0 002.76 3.07L4.608 9.32a.75.75 0 001.336.22l1.224-2.755 2.903 2.177a.75.75 0 00.94-.098l1.379-1.655a.75.75 0 00-.017-1.036L9.13 3.86l1.948-1.558a.75.75 0 00.147-.24zm-5.18 7.404L4.875 6.91l4.091-3.273 1.085.868-.973 1.168-2.903-2.177-1.225 2.754-1.17 2.634zM14.902 17.76a.75.75 0 001.06-1.06l-2.003-2.002a.75.75 0 00-1.06 0l-.708.707-.708-.707a.75.75 0 00-1.06 1.06l.707.708-.707.708a.75.75 0 001.06 1.06l.708-.707.707.707zm-3.266-3.266a.75.75 0 00-1.06 1.06l.707.707a.75.75 0 001.06 0l-.707-.707zm1.768 1.768a.75.75 0 101.06-1.06l-.707-.707a.75.75 0 00-1.06 1.06l.707.707z"}));
+    
+    const WrenchIcon = ({ className = "w-5 h-5 mr-2" }) => React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 20 20", fill: "currentColor", className: className
+    }, React.createElement('path', { fillRule: "evenodd", d: "M10 3a.75.75 0 01.75.75V4h3.25a.75.75 0 010 1.5H13v10.5a.75.75 0 01-1.5 0V5.5H8.25a.75.75 0 010-1.5H11V3.75A.75.75 0 0110 3zM5.085 4.673a.75.75 0 011.06 0l1.768 1.768A.75.75 0 017.33 7.585L5.56 9.353a.75.75 0 01-1.06-1.06l1.768-1.768a.75.75 0 010-1.06l-.172-.172zM4.543 9.893a.75.75 0 011.061 0l1.768 1.768a.75.75 0 01-1.06 1.061l-1.768-1.768a.75.75 0 010-1.061zM14.915 4.673a.75.75 0 00-1.061 0l-1.768 1.767a.75.75 0 000 1.061l1.768 1.768a.75.75 0 001.06-1.06l-1.767-1.768a.75.75 0 000-1.06l.171-.171zM15.457 9.893a.75.75 0 00-1.06 0l-1.768 1.768a.75.75 0 001.06 1.061l1.768-1.768a.75.75 0 000-1.061z", clipRule: "evenodd" }));
+
+    const CheckIcon = ({ className = "w-5 h-5 mr-1.5" }) => React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "2", stroke: "currentColor", className: className
+      }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M4.5 12.75l6 6 9-13.5" }));
+
+    const CrossIcon = ({ className = "w-5 h-5 mr-1.5" }) => React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: "2", stroke: "currentColor", className: className
+      }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18L18 6M6 6l12 12" }));
+
+    const StopIcon = ({ className = "w-5 h-5 mr-2" }) => React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 20 20", fill: "currentColor", className: className
+      }, React.createElement('path', { fillRule: "evenodd", d: "M2 10a8 8 0 1116 0 8 8 0 01-16 0zm6.75-2.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zM10.75 7a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5a.75.75 0 01.75-.75z", clipRule: "evenodd"}));
+
+
+    // --- START OF constants.js ---
+    const GEMINI_MODEL_NAME = 'gemini-1.5-flash-latest';
+    const DEFAULT_HTML_CONTENT = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Beautiful Page</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 20px; background-color: #f9fafb; color: #1f2937; }
+        .container { max-width: 800px; margin: auto; background-color: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { color: #2563eb; font-size: 2em; margin-bottom: 0.5em; }
+        p { line-height: 1.7; color: #4b5563; margin-bottom: 1em; }
+        ul { list-style-position: inside; padding-left: 0; }
+        li { margin-bottom: 0.5em; }
+        button { background-color: #2563eb; color: white; padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: background-color 0.2s ease; }
+        button:hover { background-color: #1d4ed8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to Your Transformed Page!</h1>
+        <p>This stylish HTML page showcases a cleaner, brighter look. Edit this code or use the AI assistant for enhancements.</p>
+        <p>Try asking the AI to:
+            <ul>
+                <li>"Add a vibrant call-to-action button."</li>
+                <li>"Change the heading to a deep purple color."</li>
+                <li>"Create a two-column section with an image on one side."</li>
+            </ul>
+        </p>
+        <button onclick="alert('Page Interactive!')">Explore More</button>
+    </div>
+</body>
+</html>
+`;
+    // --- END OF constants.js ---
+
+    // --- START OF services/geminiService.js ---
+    const API_KEY = "AIzaSyDSF270Y1VJf1fe4G8ZAuw7bOITbAlal74"; // This is your API Key as provided.
+
+    // Updated API Key check: Removed the check for your specific key string.
+    if (!API_KEY || API_KEY === "YOUR_API_KEY_HERE") {
+      console.warn("API_KEY might not be configured correctly (it's empty or a generic placeholder). Gemini API calls may fail. Please ensure API_KEY is a valid Google Gemini API Key.");
+    }
+    
+    const ai = new GoogleGenAI({ apiKey: API_KEY || "MISSING_API_KEY_FALLBACK" });
+
+    const cleanHtmlResponse = (text) => {
+      let cleanedText = text.trim();
+      const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
+      const match = cleanedText.match(fenceRegex);
+      if (match && match[2]) {
+        cleanedText = match[2].trim();
+      }
+      return cleanedText;
+    };
+
+    const generateHtmlWithGemini = async (prompt, onChunk, signal) => {
+      // Updated API Key check
+      if (!API_KEY || API_KEY === "YOUR_API_KEY_HERE") {
+          throw new Error("Gemini API Key is not configured or is a placeholder. Please update it in the script.");
+      }
+      try {
+        const fullPrompt = `
+You are an expert HTML code assistant.
+Generate HTML code based on the following description: "${prompt}"
+Return ONLY the complete HTML code. Do not include any explanations, comments, or markdown formatting around the code block itself.
+Ensure the HTML is well-formed and ready to be rendered.
+If the request is for a full page, include <!DOCTYPE html>, <html>, <head> (with a <title> and basic modern styling if appropriate), and <body> tags.
+If it's for a snippet, just provide the snippet.
+Strive for clean, modern, and accessible HTML.
+`;
+        const stream = await ai.models.generateContentStream({
+          model: GEMINI_MODEL_NAME,
+          contents: fullPrompt,
+        });
+
+        let accumulatedResponse = "";
+        for await (const chunk of stream) {
+          if (signal && signal.aborted) {
+            console.log("Gemini stream processing aborted by signal.");
+            throw new DOMException('Aborted by user', 'AbortError');
+          }
+          const chunkText = chunk.text;
+          if (chunkText) {
+            onChunk(chunkText);
+            accumulatedResponse += chunkText;
+          }
+        }
+        
+        return cleanHtmlResponse(accumulatedResponse);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          throw error; 
+        }
+        console.error("Error generating HTML with Gemini:", error);
+        if (error instanceof Error && (error.message.includes("API key not valid") || error.message.includes("API_KEY_INVALID"))) {
+            throw new Error("Invalid Gemini API Key. Please check your configuration and ensure the key is active and has the correct permissions.");
+        }
+        throw new Error(`Failed to generate HTML from Gemini: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    };
+
+    const modifyHtmlWithGemini = async (currentHtml, instruction, onChunk, signal) => {
+      // Updated API Key check
+      if (!API_KEY || API_KEY === "YOUR_API_KEY_HERE") {
+          throw new Error("Gemini API Key is not configured or is a placeholder. Please update it in the script.");
+      }
+      try {
+        const fullPrompt = `
+You are an expert HTML code assistant.
+You will be given current HTML code and an instruction to modify it.
+Apply the instruction to the HTML and return ONLY the complete, modified HTML code.
+Do not include any explanations, comments, or markdown formatting around the code block itself.
+Ensure the final HTML is well-formed and maintains or improves upon existing style and structure unless specified otherwise.
+
+Current HTML:
+\`\`\`html
+${currentHtml}
+\`\`\`
+
+Instruction: "${instruction}"
+
+Modified HTML:
+`;
+        const stream = await ai.models.generateContentStream({
+          model: GEMINI_MODEL_NAME,
+          contents: fullPrompt,
+        });
+
+        let accumulatedResponse = "";
+        for await (const chunk of stream) {
+          if (signal && signal.aborted) {
+            console.log("Gemini stream processing aborted by signal.");
+            throw new DOMException('Aborted by user', 'AbortError');
+          }
+          const chunkText = chunk.text;
+          if (chunkText) {
+            onChunk(chunkText);
+            accumulatedResponse += chunkText;
+          }
+        }
+
+        return cleanHtmlResponse(accumulatedResponse);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          throw error; 
+        }
+        console.error("Error modifying HTML with Gemini:", error);
+        if (error instanceof Error && (error.message.includes("API key not valid") || error.message.includes("API_KEY_INVALID"))) {
+            throw new Error("Invalid Gemini API Key. Please check your configuration and ensure the key is active and has the correct permissions.");
+        }
+        throw new Error(`Failed to modify HTML with Gemini: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    };
+    // --- END OF services/geminiService.js ---
+
+    // --- START OF components/LoadingSpinner.js ---
+    const LoadingSpinner = () => {
+      return (
+        React.createElement('div', { className: "flex justify-center items-center p-6 my-4 bg-white rounded-lg shadow" },
+          React.createElement('svg', { 
+            className: "animate-spin h-8 w-8 text-blue-600", 
+            xmlns: "http://www.w3.org/2000/svg", 
+            fill: "none", 
+            viewBox: "0 0 24 24"
+          },
+            React.createElement('circle', { 
+              className: "opacity-25", 
+              cx: "12", 
+              cy: "12", 
+              r: "10", 
+              stroke: "currentColor", 
+              strokeWidth: "4"
+            }),
+            React.createElement('path', { 
+              className: "opacity-75", 
+              fill: "currentColor", 
+              d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            })
+          ),
+          React.createElement('span', { className: "ml-4 text-lg text-gray-600 font-medium" }, "AI is thinking...")
+        )
+      );
+    };
+    // --- END OF components/LoadingSpinner.js ---
+
+    // --- START OF components/ErrorMessage.js ---
+    const ErrorMessage = ({ message, onClose }) => {
+      return (
+        React.createElement('div', { className: "bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-md shadow-md my-4", role: "alert" },
+          React.createElement('div', {className: "flex items-center"},
+            React.createElement('div', {className: "py-1"}, 
+              React.createElement('svg', {className: "fill-current h-6 w-6 text-red-500 mr-4", xmlns:"http://www.w3.org/2000/svg", viewBox:"0 0 20 20"},
+                React.createElement('path', {d:"M2.93 17.07A10 10 0 1 1 17.07 2.93 10 10 0 0 1 2.93 17.07zM11.414 10l2.829-2.828a1 1 0 1 0-1.415-1.415L10 8.586l-2.828-2.829a1 1 0 0 0-1.415 1.415L8.586 10l-2.829 2.828a1 1 0 0 0 1.415 1.415L10 11.414l2.828 2.829a1 1 0 0 0 1.415-1.415L11.414 10z"})
+              )
+            ),
+            React.createElement('div', null, 
+              React.createElement('p', { className: "font-bold" }, "Notice"),
+              React.createElement('p', { className: "text-sm" }, message)
+            ),
+            onClose && (
+              React.createElement('button',
+                {
+                  onClick: onClose,
+                  className: "ml-auto -mx-1.5 -my-1.5 bg-red-50 text-red-500 rounded-lg focus:ring-2 focus:ring-red-400 p-1.5 hover:bg-red-100 inline-flex h-8 w-8",
+                  'aria-label': "Close"
+                },
+                React.createElement('span', {className: "sr-only"}, "Close"),
+                React.createElement('svg', { className: "w-5 h-5", fill:"currentColor", viewBox: "0 0 20 20", xmlns: "http://www.w3.org/2000/svg"},
+                  React.createElement('path', {fillRule:"evenodd", d:"M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z", clipRule:"evenodd"})
+                )
+              )
+            )
+          )
+        )
+      );
+    };
+    // --- END OF components/ErrorMessage.js ---
+
+    // --- START OF components/CodeEditor.js ---
+    const CodeEditor = ({ code, setCode, readOnly = false }) => {
+      const handleChange = (event) => {
+        if (!readOnly) {
+          setCode(event.target.value);
+        }
+      };
+
+      return (
+        React.createElement('textarea', {
+          value: code,
+          onChange: handleChange,
+          readOnly: readOnly,
+          placeholder: readOnly ? "Previewing AI proposed changes..." : "Enter your HTML code here or use AI...",
+          className: `code-editor w-full h-full p-4 text-sm bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none resize-none rounded-lg shadow-inner ${readOnly ? 'cursor-default bg-gray-50' : ''}`,
+          spellCheck: "false",
+          autoCapitalize: "off",
+          autoCorrect: "off",
+          'aria-label': "HTML Code Editor",
+          'aria-readonly': readOnly,
+        })
+      );
+    };
+    // --- END OF components/CodeEditor.js ---
+
+    // --- START OF components/PreviewPanel.js ---
+    const PreviewPanel = ({ htmlCode }) => {
+      return (
+        React.createElement('iframe', {
+          srcDoc: htmlCode,
+          title: "Preview",
+          className: "w-full h-full border-none flex-grow bg-white",
+          sandbox: "allow-scripts allow-same-origin"
+        })
+      );
+    };
+    // --- END OF components/PreviewPanel.js ---
+
+    // --- START OF components/ConfirmationControls.js ---
+    const ConfirmationControls = ({ onAccept, onReject }) => {
+      const ActionButton = ({ onClick, children, className, variant = 'accept' }) => {
+        const baseStyle = "flex items-center justify-center px-5 py-2.5 rounded-md font-semibold text-sm transition-all duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-amber-50";
+        const variantStyle = variant === 'accept' 
+          ? "bg-green-600 hover:bg-green-700 active:bg-green-800 text-white focus:ring-green-400"
+          : "bg-red-600 hover:bg-red-700 active:bg-red-800 text-white focus:ring-red-400";
+        
+        return (
+          React.createElement('button',
+            {
+              onClick: onClick,
+              className: `${baseStyle} ${variantStyle} ${className || ''}`
+            },
+            children
+          )
+        );
+      };
+
+      return (
+        React.createElement('div', { className: "p-4 bg-amber-50 rounded-lg shadow-md space-y-3 border border-amber-300 my-4" },
+          React.createElement('p', { className: "text-center text-amber-800 font-medium text-sm" }, "AI has proposed changes. Review them in the editor and preview."),
+          React.createElement('div', { className: "flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 pt-2" },
+            React.createElement(ActionButton, { onClick: onAccept, variant: "accept", className: "flex-1" },
+              React.createElement(CheckIcon), " Accept Changes"
+            ),
+            React.createElement(ActionButton, { onClick: onReject, variant: "reject", className: "flex-1" },
+              React.createElement(CrossIcon), " Reject Changes"
+            )
+          )
+        )
+      );
+    };
+    // --- END OF components/ConfirmationControls.js ---
+
+    // --- START OF components/GeminiControls.js ---
+    const GeminiControls = ({ prompt, setPrompt, onGenerate, onModify, interactionState }) => {
+      const ControlButton = ({ onClick, disabled, children, className: customClassName, icon }) => (
+        React.createElement('button',
+          {
+            onClick: onClick,
+            disabled: disabled,
+            className: `flex items-center justify-center w-full px-5 py-2.5 rounded-md font-semibold text-sm transition-all duration-150 ease-in-out
+                        ${disabled ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 
+                        `bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white ${customClassName || ''}`}`
+          },
+          icon,
+          children
+        )
+      );
+
+      const isDisabled = interactionState !== 'idle';
+
+      return (
+        React.createElement('div', { className: "p-5 bg-white rounded-xl shadow-lg space-y-4 border border-gray-200" },
+          React.createElement('textarea',
+            {
+              value: prompt,
+              onChange: (e) => setPrompt(e.target.value),
+              placeholder: "Describe what HTML you want to generate or modify...",
+              rows: 4,
+              className: "w-full p-3 bg-gray-50 text-gray-700 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none resize-y placeholder-gray-400 text-sm shadow-sm",
+              disabled: isDisabled,
+              'aria-label': "Gemini prompt input"
+            }
+          ),
+          interactionState === 'idle' && React.createElement('div', { className: "flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3" },
+            React.createElement(ControlButton, { 
+                onClick: onGenerate, 
+                disabled: isDisabled || !prompt.trim(), 
+                icon: React.createElement(WandIcon, {className: "w-4 h-4 mr-2"})
+              },
+              'Generate New'
+            ),
+            React.createElement(ControlButton, { 
+                onClick: onModify, 
+                disabled: isDisabled || !prompt.trim(),
+                icon: React.createElement(WrenchIcon, {className: "w-4 h-4 mr-2"})
+              },
+              'Modify Existing'
+            )
+          )
+        )
+      );
+    };
+    // --- END OF components/GeminiControls.js ---
+
+    // --- START OF App.js ---
+    const App = () => {
+      const [htmlCode, setHtmlCode] = useState(DEFAULT_HTML_CONTENT);
+      const [geminiPrompt, setGeminiPrompt] = useState('');
+      const [error, setError] = useState(null);
+      
+      const [interactionState, setInteractionState] = useState('idle'); 
+      const [streamingBuffer, setStreamingBuffer] = useState('');
+      const [proposedHtmlCode, setProposedHtmlCode] = useState(null);
+      const [originalCodeBeforeOperation, setOriginalCodeBeforeOperation] = useState(DEFAULT_HTML_CONTENT);
+
+      const abortControllerRef = useRef(null);
+
+      const handleChunk = useCallback((chunk) => {
+        setStreamingBuffer(prev => prev + chunk);
+      }, []);
+
+      const handleOperationStart = (currentCodeForModification) => {
+        abortControllerRef.current = new AbortController(); 
+        setOriginalCodeBeforeOperation(currentCodeForModification || htmlCode);
+        setError(null);
+        setStreamingBuffer('');
+        setProposedHtmlCode(null);
+        setInteractionState('streaming');
+      };
+
+      const handleOperationError = (errorMessage, isUserCancelled = false) => {
+        setError(errorMessage);
+        setInteractionState('idle');
+        setStreamingBuffer('');
+        setProposedHtmlCode(null);
+        if (!isUserCancelled) {
+          setHtmlCode(originalCodeBeforeOperation);
+        }
+      };
+      
+      const handleStopGeneration = useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        setInteractionState('idle');
+        setStreamingBuffer(''); 
+        setHtmlCode(originalCodeBeforeOperation); 
+        setProposedHtmlCode(null);
+        setError("AI generation stopped by user."); 
+        console.log("AI generation stopped by user.");
+      }, [originalCodeBeforeOperation]);
+
+
+      const commonGeminiOp = async (apiCall, ...args) => {
+        const currentAbortController = new AbortController();
+        abortControllerRef.current = currentAbortController;
+
+        try {
+            const resultHtml = await apiCall(...args, currentAbortController.signal);
+            
+            if (currentAbortController.signal.aborted) {
+                console.log("Operation was aborted by user during API call return.");
+                return;
+            }
+            setProposedHtmlCode(resultHtml);
+            setInteractionState('confirming');
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                console.log("Operation aborted by user (caught AbortError).");
+                if (interactionState !== 'idle') { 
+                    handleOperationError("Generation cancelled by user.", true);
+                }
+            } else {
+                console.error(err);
+                handleOperationError(err instanceof Error ? err.message : "An unknown error occurred.");
+            }
+        } finally {
+            if (!currentAbortController.signal.aborted) {
+                setStreamingBuffer('');
+            }
+        }
+      };
+
+      const handleGenerateCode = useCallback(async () => {
+        if (!geminiPrompt.trim()) {
+          setError("Please enter a prompt for the AI.");
+          return;
+        }
+        handleOperationStart(); 
+        await commonGeminiOp(generateHtmlWithGemini, geminiPrompt, handleChunk);
+      }, [geminiPrompt, handleChunk, htmlCode]);
+
+      const handleModifyCode = useCallback(async () => {
+        if (!geminiPrompt.trim()) {
+          setError("Please enter a modification instruction for the AI.");
+          return;
+        }
+        handleOperationStart(htmlCode); 
+        await commonGeminiOp(modifyHtmlWithGemini, htmlCode, geminiPrompt, handleChunk);
+      }, [htmlCode, geminiPrompt, handleChunk]);
+
+
+      const handleAcceptChanges = useCallback(() => {
+        if (proposedHtmlCode !== null) {
+          setHtmlCode(proposedHtmlCode);
+          setOriginalCodeBeforeOperation(proposedHtmlCode);
+        }
+        setInteractionState('idle');
+        setProposedHtmlCode(null);
+        setGeminiPrompt(''); 
+        setError(null);
+      }, [proposedHtmlCode]);
+
+      const handleRejectChanges = useCallback(() => {
+        setHtmlCode(originalCodeBeforeOperation); 
+        setInteractionState('idle');
+        setProposedHtmlCode(null);
+        setStreamingBuffer(''); 
+        setError(null);
+      }, [originalCodeBeforeOperation]);
+
+      const displayedCodeInEditor = () => {
+        if (interactionState === 'streaming') return streamingBuffer;
+        if (interactionState === 'confirming' && proposedHtmlCode !== null) return proposedHtmlCode;
+        return htmlCode;
+      };
+
+      const displayedCodeInPreview = () => {
+        if (interactionState === 'confirming' && proposedHtmlCode !== null) return proposedHtmlCode;
+        return htmlCode;
+      }
+      
+      const StopButton = () => React.createElement('button', {
+            onClick: handleStopGeneration,
+            className: "flex items-center justify-center w-full px-5 py-2.5 mt-3 rounded-md font-semibold text-sm text-white bg-red-600 hover:bg-red-700 active:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white"
+          },
+        React.createElement(StopIcon, {className: "w-4 h-4 mr-2"}),
+        "Stop Generating"
+      );
+
+      return (
+        React.createElement('div', { className: "min-h-screen flex flex-col" },
+          React.createElement('header', { className: "bg-white p-4 shadow-sm border-b border-gray-200 sticky top-0 z-10" },
+            React.createElement('div', {className: "max-w-7xl mx-auto flex items-center justify-center"},
+                React.createElement(SparklesIcon, {className: "w-7 h-7 text-yellow-500 mr-2"}),
+                React.createElement('h1', { className: "text-2xl font-semibold text-blue-700" },
+                "Gemini HTML IDE"
+                ),
+                React.createElement(RocketIcon, {className: "w-7 h-7 text-red-500 ml-2"})
+            )
+          ),
+          React.createElement('main', { className: "flex-grow flex flex-col md:flex-row p-4 lg:p-6 gap-4 lg:gap-6 bg-gray-100" },
+            React.createElement('div', { className: "flex flex-col md:w-1/2 space-y-4 lg:space-y-5" },
+              React.createElement(GeminiControls, {
+                prompt: geminiPrompt,
+                setPrompt: setGeminiPrompt,
+                onGenerate: handleGenerateCode,
+                onModify: handleModifyCode,
+                interactionState: interactionState
+              }),
+              error && React.createElement(ErrorMessage, { 
+                  message: error, 
+                  onClose: () => setError(null) 
+              }),
+              interactionState === 'streaming' && React.createElement('div', null, 
+                React.createElement(LoadingSpinner, null),
+                React.createElement(StopButton, null)
+              ),
+              interactionState === 'confirming' && proposedHtmlCode !== null && (
+                React.createElement(ConfirmationControls, {
+                  onAccept: handleAcceptChanges,
+                  onReject: handleRejectChanges
+                })
+              ),
+              React.createElement('div', { className: "flex-grow relative overflow-hidden rounded-xl shadow-lg border border-gray-200" },
+                React.createElement(CodeEditor, {
+                  code: displayedCodeInEditor(),
+                  setCode: interactionState === 'idle' ? setHtmlCode : () => {},
+                  readOnly: interactionState !== 'idle'
+                })
+              )
+            ),
+            React.createElement('div', { className: "md:w-1/2 flex flex-col overflow-hidden rounded-xl shadow-lg border border-gray-200 bg-white" },
+              React.createElement('div', { className: "p-3 bg-gray-200 text-gray-700 border-b border-gray-300 font-semibold text-sm" }, "Live Preview"),
+              React.createElement(PreviewPanel, { htmlCode: displayedCodeInPreview() })
+            )
+          ),
+          React.createElement('footer', { className: "bg-gray-200 p-4 text-center text-xs text-gray-500 border-t border-gray-300" },
+            "Crafted with AI  Powered by Google Gemini & React. Designed for a brighter coding experience. Ensure your Gemini API Key is correctly configured for full functionality."
+          )
+        )
+      );
+    };
+    // --- END OF App.js ---
+
+    // --- START OF index.js ---
+    const rootElement = document.getElementById('root');
+    if (!rootElement) {
+      throw new Error("Could not find root element to mount to");
+    }
+
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(
+      React.createElement(React.StrictMode, null, 
+        React.createElement(App, null)
+      )
+    );
+    // --- END OF index.js ---
+  </script>
+</body>
+</html>
