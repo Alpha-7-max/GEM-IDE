@@ -97,7 +97,7 @@
 
 
     // --- START OF constants.js ---
-    const GEMINI_MODEL_NAME = 'gemini-1.5-flash-latest';
+    const GEMINI_MODEL_NAME = 'gemini-2.5-flash-preview-05-20'; // <<<< MODEL NAME UPDATED AS PER REQUEST
     const DEFAULT_HTML_CONTENT = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -136,7 +136,6 @@
     // --- START OF services/geminiService.js ---
     const API_KEY = "AIzaSyDSF270Y1VJf1fe4G8ZAuw7bOITbAlal74"; // This is your API Key as provided.
 
-    // Updated API Key check: Removed the check for your specific key string.
     if (!API_KEY || API_KEY === "YOUR_API_KEY_HERE") {
       console.warn("API_KEY might not be configured correctly (it's empty or a generic placeholder). Gemini API calls may fail. Please ensure API_KEY is a valid Google Gemini API Key.");
     }
@@ -154,7 +153,6 @@
     };
 
     const generateHtmlWithGemini = async (prompt, onChunk, signal) => {
-      // Updated API Key check
       if (!API_KEY || API_KEY === "YOUR_API_KEY_HERE") {
           throw new Error("Gemini API Key is not configured or is a placeholder. Please update it in the script.");
       }
@@ -168,8 +166,9 @@ If the request is for a full page, include <!DOCTYPE html>, <html>, <head> (with
 If it's for a snippet, just provide the snippet.
 Strive for clean, modern, and accessible HTML.
 `;
+        // The GEMINI_MODEL_NAME constant is used here, reflecting the user's requested change.
         const stream = await ai.models.generateContentStream({
-          model: GEMINI_MODEL_NAME,
+          model: GEMINI_MODEL_NAME, 
           contents: fullPrompt,
         });
 
@@ -200,7 +199,6 @@ Strive for clean, modern, and accessible HTML.
     };
 
     const modifyHtmlWithGemini = async (currentHtml, instruction, onChunk, signal) => {
-      // Updated API Key check
       if (!API_KEY || API_KEY === "YOUR_API_KEY_HERE") {
           throw new Error("Gemini API Key is not configured or is a placeholder. Please update it in the script.");
       }
@@ -221,6 +219,7 @@ Instruction: "${instruction}"
 
 Modified HTML:
 `;
+        // The GEMINI_MODEL_NAME constant is used here, reflecting the user's requested change.
         const stream = await ai.models.generateContentStream({
           model: GEMINI_MODEL_NAME,
           contents: fullPrompt,
